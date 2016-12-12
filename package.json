@@ -1,0 +1,19 @@
+{
+  "name": "bodewell-service",
+  "version": "0.0.1",
+  "description": "Bodewell system monitor service",
+  "main": "service.js",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/richRemer/bodewell-service.git"
+  },
+  "author": "Richard Remer (reanjr@gmail.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/richRemer/bodewell-service/issues"
+  },
+  "homepage": "https://github.com/richRemer/bodewell-service#readme",
+  "dependencies": {
+    "bodewell-resource": "0.0.1"
+  }
+}
