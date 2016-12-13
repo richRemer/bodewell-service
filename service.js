@@ -1,5 +1,6 @@
 const fs = require("fs");
 const Resource = require("bodewell-resource");
+const Monitor = require("bodewell-monitor");
 
 const resources$priv = Symbol("Service.resources");
 const monitors$priv = Symbol("Service.monitors");
@@ -46,7 +47,8 @@ Service.prototype[loop$priv] = null;
 Service.prototype.start = function() {
     if (!this[loop$priv]) {
         this[loop$priv] = this.loop();
-        this.info("monitor service started");
+        Array.from(this[monitors$priv].values()).forEach(res => res.start());
+        this.info("service started");
     }
 };
 
@@ -57,7 +59,7 @@ Service.prototype.stop = function() {
     if (this[loop$priv]) {
         this[loop$priv]();
         this[loop$priv] = null;
-        this.info("monitor service stopped");
+        this.info("service stopped");
     }
 };
 
@@ -79,7 +81,7 @@ Service.prototype.resource = function(name, Resource) {
 };
 
 /**
- * Define a monitor.
+ * Define or configure a monitor.
  * @param {string} name
  * @param {object} opts
  * @param {string} opts.resource
@@ -87,6 +89,13 @@ Service.prototype.resource = function(name, Resource) {
 Service.prototype.monitor = function(name, opts) {
     var action = this[monitors$priv].has(name) ? "configuring" : "defining";
     this.info(`${action} ${name} monitor`);
+
+    if (this[monitors$priv].has(name)) {
+        this[monitors$priv].get(name).configure(opts);
+    } else {
+        this[monitors$priv].set(name, new Monitor(this, opts.resource));
+        this[monitors$priv].get(name).configure(opts);
+    }
 };
 
 /**
@@ -117,7 +126,7 @@ Service.prototype.discover = function() {
 Service.prototype.loop = function() {
     var service = this,
         loop,
-        delay = 60 * 1000;
+        delay = 10 * 60 * 1000; // 10 mins
 
     function iteration() {
         service.discover()
