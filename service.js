@@ -13,6 +13,8 @@ const noise$priv = Symbol("Service.noise");
 const debug$priv = Symbol("Service.debug");
 const loop$priv = Symbol("Service.loop");
 
+const service$key = Symbol("key");
+
 /**
  * Bodewell service object.
  * @constructor
@@ -46,8 +48,8 @@ Service.prototype[loop$priv] = null;
  */
 Service.prototype.start = function() {
     if (!this[loop$priv]) {
-        this[loop$priv] = this.loop();
         Array.from(this[monitors$priv].values()).forEach(res => res.start());
+        this[loop$priv] = this.loop();
         this.info("service started");
     }
 };
@@ -57,6 +59,7 @@ Service.prototype.start = function() {
  */
 Service.prototype.stop = function() {
     if (this[loop$priv]) {
+        Array.from(this[monitors$priv].values()).forEach(res => res.stop());
         this[loop$priv]();
         this[loop$priv] = null;
         this.info("service stopped");
@@ -68,7 +71,7 @@ Service.prototype.stop = function() {
  * @param {string} name
  * @param {function} Resource
  */
-Service.prototype.resource = function(name, Resource) {
+Service.prototype.resource = function(name, Type) {
     if (arguments.length < 2) {
         return Resource.prototype.resource.call(this, name);
     }
@@ -77,7 +80,7 @@ Service.prototype.resource = function(name, Resource) {
         throw new Error(`cannot redefine '${name}' resource`);
     }
 
-    this[resources$priv].set(name, Resource);
+    this[resources$priv].set(name, Type);
 };
 
 /**
@@ -87,15 +90,16 @@ Service.prototype.resource = function(name, Resource) {
  * @param {string} opts.resource
  */
 Service.prototype.monitor = function(name, opts) {
-    var action = this[monitors$priv].has(name) ? "configuring" : "defining";
-    this.info(`${action} ${name} monitor`);
+    var monitor = this[monitors$priv].get(name);
 
-    if (this[monitors$priv].has(name)) {
-        this[monitors$priv].get(name).configure(opts);
-    } else {
-        this[monitors$priv].set(name, new Monitor(this, opts.resource));
-        this[monitors$priv].get(name).configure(opts);
+    if (!monitor) {
+        monitor = new Monitor(this);
+        monitor[service$key] = name;
+        this[monitors$priv].set(name, monitor);
     }
+
+    monitor.configure(opts);
+    this.info(`monitor '${name}' configured`);
 };
 
 /**
@@ -117,6 +121,22 @@ Service.prototype.discover = function() {
             this.info(`discovered ${d.length} resources`);
         });
 }
+
+/**
+ * Trigger a monitor failure.
+ * @param {Monitor} monitor
+ */
+Service.prototype.trigger = function(monitor) {
+    this.info("failure", monitor);
+};
+
+/**
+ * Clear a monitor failure.
+ * @param {Monitor} monitor
+ */
+Service.prototype.clear = function(monitor) {
+    this.info("recovery", monitor);
+};
 
 /**
  * Create service loop.  Returns loop cancel function.  This is called by the
@@ -145,8 +165,13 @@ Service.prototype.loop = function() {
 /**
  * Write information message to log.
  * @param {string} message
+ * @param {object} [context]
  */
-Service.prototype.info = function(message) {
+Service.prototype.info = function(message, context) {
+    message = context
+        ? `${message} (${context[service$key]})`
+        : message;
+
     this.log("INFO", message);
 
     if (this.console && this[noise$priv] >= 2) {
@@ -157,8 +182,13 @@ Service.prototype.info = function(message) {
 /**
  * Write warning message to log.
  * @param {string} message
+ * @param {object} [context]
  */
-Service.prototype.warn = function(message) {
+Service.prototype.warn = function(message, context) {
+    message = context
+        ? `${message} (${context[service$key]})`
+        : message;
+
     this.log("WARN", message);
 
     if (this.console && this[noise$priv] >= 1) {
@@ -169,14 +199,19 @@ Service.prototype.warn = function(message) {
 /**
  * Write error or error message to log.
  * @param {Error|string} err
+ * @param {object} [context]
  */
-Service.prototype.error = function(err) {
-    var errmsg = err[this.debugging ? "stack" : "message"] || err;
+Service.prototype.error = function(err, context) {
+    var message = err[this.debugging ? "stack" : "message"] || err;
 
-    this.log("ERRO", errmsg);
+    message = context
+        ? `${message} (${context[service$key]})`
+        : message;
+
+    this.log("ERRO", message);
 
     if (this.console && this[noise$priv] >= 0) {
-        console.error("ERROR:", errmsg);
+        console.error("ERROR:", message);
     }
 };
 
