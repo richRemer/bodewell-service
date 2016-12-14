@@ -123,7 +123,7 @@ Service.prototype.discover = function() {
 }
 
 /**
- * Trigger a monitor failure.
+ * Trigger monitor failure.
  * @param {Monitor} monitor
  */
 Service.prototype.trigger = function(monitor) {
@@ -131,10 +131,10 @@ Service.prototype.trigger = function(monitor) {
 };
 
 /**
- * Clear a monitor failure.
+ * Release triggered monitor.
  * @param {Monitor} monitor
  */
-Service.prototype.clear = function(monitor) {
+Service.prototype.release = function(monitor) {
     this.info("recovery", monitor);
 };
 
@@ -163,13 +163,30 @@ Service.prototype.loop = function() {
 }
 
 /**
+ * Write trace message to log.
+ * @param {string} message
+ * @param {object} [context]
+ */
+Service.prototype.trace = function(message, context) {
+    message = context
+        ? `[${context[service$key]}] ${message}`
+        : message;
+
+    if (this.debugging) this.log("TRAC", message);
+
+    if (this.console && this[noise$priv] >= 3) {
+        console.log("--->", message);
+    }
+};
+
+/**
  * Write information message to log.
  * @param {string} message
  * @param {object} [context]
  */
 Service.prototype.info = function(message, context) {
     message = context
-        ? `${message} (${context[service$key]})`
+        ? `[${context[service$key]}] ${message}`
         : message;
 
     this.log("INFO", message);
@@ -186,7 +203,7 @@ Service.prototype.info = function(message, context) {
  */
 Service.prototype.warn = function(message, context) {
     message = context
-        ? `${message} (${context[service$key]})`
+        ? `[${context[service$key]}] ${message}`
         : message;
 
     this.log("WARN", message);
@@ -205,7 +222,7 @@ Service.prototype.error = function(err, context) {
     var message = err[this.debugging ? "stack" : "message"] || err;
 
     message = context
-        ? `${message} (${context[service$key]})`
+        ? `[${context[service$key]}] ${message}`
         : message;
 
     this.log("ERRO", message);
